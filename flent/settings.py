@@ -154,6 +154,12 @@ class ListTests(FuncAction):
 parser = ArgParser(description='The FLExible Network Tester.')
 
 parser.add_argument(
+    "--topo",
+    dest="TOPO", action='store',
+    help="topology file"
+)
+
+parser.add_argument(
     "args", nargs="*", type=unicode, metavar="host|test|input_file",
     help="Hostname, test name or input filenames.")
 
@@ -758,6 +764,8 @@ def load(argv):
     settings = parser.parse_args(argv, namespace=Settings(DEFAULT_SETTINGS))
     settings.process_args()
     settings.update_implications()
+
+    print(settings.TOPO)
 
     if settings.SCALE_DATA:
         scale_data = []

@@ -25,12 +25,58 @@ import locale
 import os
 import signal
 import sys
+from importlib import import_module
+import subprocess
+import threading
+import time
+# import user_script
 
+def exec_subprocess(cmd, block=True):
+    temp = subprocess.Popen(cmd.split())
+    if block:
+        temp.communicate()
+    else:
+        pass
+    
+def server(ns):
+    # run netserver
+    print('server: {}'.format(ns))
+    exec_subprocess('ip netns exec ' + ns + ' netserver')
+    print('ip netns exec ' + ns + ' netserver')
+
+def client(ns, cmd, server_ip):
+    print('client: {} {} {}'.format(ns, cmd, server_ip))
+    # TODO: Run flent with appropriate arguements
+    # exec_subprocess('ip netns exec {} traceroute 10.2.2.2'.format(ns))
+    # exec_subprocess('ip netns exec n1 flent tcp_download -H 10.2.2.2 --length 1')
+    # exec_subprocess('ip netns exec n1 flent tcp download -H 10.2.2.2 --length 1')
+    exec_subprocess('ip netns exec ' + ns + ' ' + cmd + ' -H ' + server_ip + " --length 1")
+    # + 'flent tcp_download -H 10.1.2.2 -p tcp_cwnd --socket-stats -o cwnd.png')
+    print('ip netns exec ' + ns + ' ' + cmd + ' -H ' + server_ip + " --length 1")
 
 # Convert SIGTERM into SIGINT to apply the same shutdown logic.
 def handle_sigterm(sig, frame):
     os.kill(os.getpid(), signal.SIGINT)
 
+def arg_parse():
+    args = sys.argv[1:]
+    # args_list = args.split()
+    print(args)
+    i = args.index("--topo")
+    # args[i] = ''
+    # args[i+1] = ''
+    # print(args)
+    args.remove(args[i])
+    args.remove(args[i])
+    print(args)
+
+    new_args = 'flent'
+    for arg in args:
+        new_args += ' ' + arg
+    print(new_args)
+    return new_args
+    
+    
 
 def run_flent(gui=False):
     if sys.version_info[:2] < (3, 5):
@@ -51,7 +97,33 @@ def run_flent(gui=False):
         try:
             signal.signal(signal.SIGTERM, handle_sigterm)
             settings = load(sys.argv[1:])
-            if gui or settings.GUI:
+            if(settings.TOPO):
+                sys.path.append(os.path.dirname(os.path.abspath(settings.TOPO)))
+                print(os.path.dirname(os.path.abspath(settings.TOPO)))
+                filename = os.path.basename(settings.TOPO)
+                print(filename)
+                topology = import_module(filename[:-3])
+                (client_ns, client_ip, server_ns, server_ip) = topology.run()
+                new_args = arg_parse()
+
+                # exec_subprocess("ip netns exec n1 ping 10.2.2.2 -c 5")
+
+                # TODO: Set server_ns and client_ns here
+
+                t1 = threading.Thread(target=server, args=(server_ns, ))
+                t2 = threading.Thread(target=client, args=(client_ns, new_args, server_ip, ))
+
+                t1.start()
+                time.sleep(2.0)
+                t2.start()
+
+                t1.join()
+                t2.join()
+
+                # run user script
+
+                pass
+            elif gui or settings.GUI:
                 from flent.gui import run_gui
                 return run_gui(settings)
             else:
